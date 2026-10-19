@@ -3,7 +3,7 @@ dist
 .next
 .env*
 !.env.example
-
+!.env.test.example
 *.log
 *.tsbuildinfo
 coverage
