@@ -1,0 +1,26 @@
+{
+	"name": "@repo/db",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"scripts": {
+		"generate": "bun --bun run drizzle-kit generate",
+		"migrate": "bun --bun run drizzle-kit migrate",
+		"push": "bun --bun run drizzle-kit push",
+		"seed": "bun src/seed.ts",
+		"studio": "bun --bun run drizzle-kit studio",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"drizzle-orm": "^0.45.4",
+		"pg": "^8.23.1"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.5",
+		"@types/pg": "^8.23.1",
+		"drizzle-kit": "^0.31.11",
+		"typescript": "^7.0.2"
+	}
+}

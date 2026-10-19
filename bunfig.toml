@@ -1,0 +1,2 @@
+# Root scripts explicitly select .env or .env.test; do not inherit auto-loaded development values.
+env = false
