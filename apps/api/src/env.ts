@@ -1,5 +1,8 @@
 import { requireDatabaseUrl } from '@repo/db';
 
+export const APP_ENV = 'APP_ENV';
+export type AppEnv = ReturnType<typeof readEnv>;
+
 export function readEnv(env: NodeJS.ProcessEnv) {
   const databaseUrl = requireDatabaseUrl(env.DATABASE_URL);
   const port = env.API_PORT ?? '4000';
