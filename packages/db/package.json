@@ -9,15 +9,19 @@
 		"generate": "bun --bun run drizzle-kit generate",
 		"migrate": "bun --bun run drizzle-kit migrate",
 		"push": "bun --bun run drizzle-kit push",
-		"seed": "bun src/seed.ts",
+		"seed": "bun scripts/seed.ts",
+		"check": "bun scripts/check.ts",
+		"test": "bun test ./test",
 		"studio": "bun --bun run drizzle-kit studio",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@repo/contracts": "workspace:*",
 		"drizzle-orm": "^0.45.4",
 		"pg": "^8.23.1"
 	},
 	"devDependencies": {
+		"@types/bun": "^1.4.3",
 		"@types/node": "^26.6.5",
 		"@types/pg": "^8.23.1",
 		"drizzle-kit": "^0.31.11",

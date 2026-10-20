@@ -1,0 +1,4 @@
+ALTER TABLE "idempotency_requests" DROP CONSTRAINT "idempotency_requests_key_check";--> statement-breakpoint
+ALTER TABLE "idempotency_requests" DROP CONSTRAINT "idempotency_requests_response_check";--> statement-breakpoint
+ALTER TABLE "idempotency_requests" ADD CONSTRAINT "idempotency_requests_key_check" CHECK ("idempotency_requests"."key" ~ '^[ -~]{1,128}$');--> statement-breakpoint
+ALTER TABLE "idempotency_requests" ADD CONSTRAINT "idempotency_requests_response_check" CHECK (("idempotency_requests"."response_status" is null and "idempotency_requests"."response_body" is null) or ("idempotency_requests"."response_status" is not null and "idempotency_requests"."response_status" between 200 and 299 and "idempotency_requests"."response_body" is not null));

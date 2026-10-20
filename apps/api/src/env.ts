@@ -1,4 +1,4 @@
-import { requireDatabaseUrl } from '@repo/db/src/env.js';
+import { requireDatabaseUrl } from '@repo/db';
 
 export function readEnv(env: NodeJS.ProcessEnv) {
   const databaseUrl = requireDatabaseUrl(env.DATABASE_URL);

@@ -1,0 +1,12 @@
+{
+  "name": "@repo/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./users": "./src/users.ts",
+    "./orders": "./src/orders.ts"
+  },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^7.0.2" }
+}

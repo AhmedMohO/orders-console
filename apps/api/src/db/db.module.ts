@@ -1,5 +1,6 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
 import { createDb } from '@repo/db';
+import type { Database } from '@repo/db';
 
 export const DB = 'DB';
 
@@ -13,4 +14,10 @@ export const DB = 'DB';
     ],
     exports: [DB],
 })
-export class DbModule { }
+export class DbModule implements OnApplicationShutdown {
+    constructor(@Inject(DB) private readonly db: Database) { }
+
+    async onApplicationShutdown() {
+        await this.db.$client.end();
+    }
+}

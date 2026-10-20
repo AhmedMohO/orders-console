@@ -16,7 +16,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@repo/db": "workspace:*",
+    "@repo/contracts": "workspace:*",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
