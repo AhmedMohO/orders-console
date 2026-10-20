@@ -5,23 +5,18 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request } from 'express';
-import {
-  AUTH_COOKIE,
-  AuthService,
-  type AuthenticatedUser,
-} from '../auth.service.js';
+import { AuthService } from '../auth.service.js';
+import { APP_ENV } from '../../common/consts/tokens.js';
+import type { AppEnv } from '../../common/types/env.js';
+import type { AuthRequest } from '../types/auth.js';
 import { Public } from '../decorators/public.decorator.js';
-
-export interface AuthRequest extends Request {
-  user: AuthenticatedUser;
-}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(AuthService) private readonly auth: AuthService,
+    private readonly reflector: Reflector,
+    private readonly auth: AuthService,
+    @Inject(APP_ENV) private readonly env: AppEnv,
   ) { }
 
   async canActivate(context: ExecutionContext) {
@@ -33,7 +28,9 @@ export class AuthGuard implements CanActivate {
     )
       return true;
     const request = context.switchToHttp().getRequest<AuthRequest>();
-    request.user = await this.auth.authenticate(request.cookies?.[AUTH_COOKIE]);
+    request.user = await this.auth.authenticate(
+      request.cookies?.[this.env.authCookie],
+    );
     return true;
   }
 }

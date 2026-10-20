@@ -1,8 +1,5 @@
 import { requireDatabaseUrl } from '@repo/db';
 
-export const APP_ENV = 'APP_ENV';
-export type AppEnv = ReturnType<typeof readEnv>;
-
 export function readEnv(env: NodeJS.ProcessEnv) {
   const databaseUrl = requireDatabaseUrl(env.DATABASE_URL);
   const port = env.API_PORT ?? '4000';
@@ -46,5 +43,33 @@ export function readEnv(env: NodeJS.ProcessEnv) {
     throw new Error('NODE_ENV must be development, test, or production');
   }
 
-  return { databaseUrl, apiPort: Number(port), appOrigin, jwtSecret, nodeEnv };
+  const authCookie = env.AUTH_COOKIE;
+  if (
+    !authCookie ||
+    authCookie.startsWith('__') ||
+    !/^[A-Za-z0-9_][A-Za-z0-9_-]{0,63}$/.test(authCookie)
+  ) {
+    throw new Error(
+      'AUTH_COOKIE must be a cookie name of 1–64 letters, digits, underscores or hyphens without a leading double underscore',
+    );
+  }
+
+  const tokenSeconds = env.TOKEN_SECONDS ?? '';
+  if (
+    !/^\d+$/.test(tokenSeconds) ||
+    Number(tokenSeconds) < 1 ||
+    Number(tokenSeconds) > 86400
+  ) {
+    throw new Error('TOKEN_SECONDS must be an integer from 1 to 86400');
+  }
+
+  return {
+    databaseUrl,
+    apiPort: Number(port),
+    appOrigin,
+    jwtSecret,
+    nodeEnv,
+    authCookie,
+    tokenSeconds: Number(tokenSeconds),
+  };
 }

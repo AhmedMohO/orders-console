@@ -26,8 +26,9 @@ import { demoAccounts } from '@repo/db/scripts/seed.js';
 import { openTestDatabase } from '@repo/db/test/database.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
-import { DB } from '../src/db/db.module.js';
-import { APP_ENV, readEnv } from '../src/env.js';
+import { APP_ENV, DB } from '../src/common/consts/tokens.js';
+import { readEnv } from '../src/env.js';
+import type { AppEnv } from '../src/common/types/env.js';
 import { Roles } from '../src/auth/decorators/roles.decorator.js';
 
 const origin = 'http://localhost:2001';
@@ -61,16 +62,22 @@ class ProofController {
 class ProofModule { }
 
 async function makeApp(
-  options: { production?: boolean; dropLogout?: boolean } = {},
+  options: {
+    production?: boolean;
+    dropLogout?: boolean;
+    env?: Partial<AppEnv>;
+  } = {},
 ) {
   const connection = await openTestDatabase();
   const builder = Test.createTestingModule({ imports: [ProofModule] })
     .overrideProvider(DB)
     .useValue(connection);
-  if (options.production)
-    builder
-      .overrideProvider(APP_ENV)
-      .useValue({ ...readEnv(process.env), nodeEnv: 'production' });
+  if (options.production || options.env)
+    builder.overrideProvider(APP_ENV).useValue({
+      ...readEnv(process.env),
+      ...options.env,
+      ...(options.production ? { nodeEnv: 'production' } : {}),
+    });
   const module = await builder.compile();
   const instance = module.createNestApplication({
     bodyParser: false,
@@ -280,6 +287,31 @@ test('auth wrong, unknown, unconfigured and whitespace-altered passwords have on
   expect(bodies[0].message).toBe('Invalid email or password');
 });
 
+test('auth uses the configured cookie name and lifetime for login, authentication and logout', async () => {
+  const configured = await makeApp({
+    env: { authCookie: 'review_access', tokenSeconds: 60 },
+  });
+  const response = await login(configured).expect(200);
+  const cookie = cookieOf(response);
+  expect(cookie.startsWith('review_access=')).toBe(true);
+  const claims = configured
+    .get(JwtService)
+    .verify<{ exp: number; iat: number }>(
+      cookie.slice('review_access='.length),
+    );
+  expect(claims.exp - claims.iat).toBe(60);
+  await request(configured.getHttpServer())
+    .get('/api/auth/me')
+    .set('Cookie', cookie)
+    .expect(200);
+  const cleared = await logout(cookie, configured).expect(204);
+  expect(String(cleared.headers['set-cookie'])).toStartWith('review_access=;');
+  await request(configured.getHttpServer())
+    .get('/api/auth/me')
+    .set('Cookie', cookie)
+    .expect(401);
+});
+
 test.each([
   {},
   { email: 'invalid', password: 'x' },
@@ -412,6 +444,11 @@ test('auth rejects forged, expired, wrong-algorithm, wrong-issuer/audience and m
     await signedClaims({ ...valid, sub: '0' }),
     await signedClaims({ ...valid, sub: '2147483648' }),
     await signedClaims({ ...valid, sub: '0' + admin.id }),
+    await signedClaims({ ...valid, sub: '-1' }),
+    await signedClaims({ ...valid, sub: '1.5' }),
+    await signedClaims({ ...valid, sub: '1e2' }),
+    await signedClaims({ ...valid, sid: 42 }),
+    await signedClaims({ ...valid, exp: valid.exp + 0.5 }),
     await signedClaims({ sid, exp: valid.exp }),
     'orders_access=garbage',
   ];
@@ -554,7 +591,7 @@ test('auth logout retry succeeds after the committed response is dropped', async
   await logout(cookie, dropping).expect(204);
 });
 
-test('auth login prunes only its own expired sessions and signing failure rolls back', async () => {
+test('auth login prunes only its own expired sessions and signing failure writes nothing', async () => {
   const expired = await sessionCookie(admin, new Date(Date.now() - 1000));
   const unrelated = await sessionCookie(agent, new Date(Date.now() - 1000));
   const active = await sessionCookie();

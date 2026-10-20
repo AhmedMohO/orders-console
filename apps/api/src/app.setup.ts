@@ -1,18 +1,8 @@
-import {
-  ValidationPipe,
-  type INestApplication,
-  type ValidationPipeOptions,
-} from '@nestjs/common';
+import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-
-export const validationOptions: ValidationPipeOptions = {
-  transform: true,
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  validationError: { target: false, value: false },
-};
+import { validationOptions } from './common/consts/validation.js';
 
 // Create the application with bodyParser:false so only the bounded JSON parser is active.
 export function configureApp(app: INestApplication): void {

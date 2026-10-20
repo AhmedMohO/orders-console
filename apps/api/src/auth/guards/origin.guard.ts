@@ -6,7 +6,8 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { APP_ENV, type AppEnv } from '../../env.js';
+import { APP_ENV } from '../../common/consts/tokens.js';
+import type { AppEnv } from '../../common/types/env.js';
 
 @Injectable()
 export class OriginGuard implements CanActivate {

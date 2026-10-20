@@ -8,22 +8,21 @@ import {
   Req,
   Res,
   UseGuards,
-  ValidationPipe,
 } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { UserResponse } from '@repo/contracts/users';
-import { APP_ENV, type AppEnv } from '../env.js';
-import { validationOptions } from '../app.setup.js';
-import { AUTH_COOKIE, AuthService } from './auth.service.js';
-import type { AuthRequest } from './guards/auth.guard.js';
+import { APP_ENV } from '../common/consts/tokens.js';
+import type { AppEnv } from '../common/types/env.js';
+import { AuthService } from './auth.service.js';
+import type { AuthRequest } from './types/auth.js';
 import { LoginDto } from './login.dto.js';
 import { Public } from './decorators/public.decorator.js';
 
 @Controller('auth')
 export class AuthController {
   constructor(
-    @Inject(AuthService) private readonly auth: AuthService,
+    private readonly auth: AuthService,
     @Inject(APP_ENV) private readonly env: AppEnv,
   ) { }
 
@@ -41,14 +40,12 @@ export class AuthController {
   @HttpCode(200)
   @UseGuards(ThrottlerGuard)
   async login(
-    // Bun does not emit design:paramtypes; give Nest the runtime DTO explicitly.
-    @Body(new ValidationPipe({ ...validationOptions, expectedType: LoginDto }))
-    input: LoginDto,
+    @Body() input: LoginDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<UserResponse> {
     const result = await this.auth.login(input);
     response.setHeader('Cache-Control', 'no-store');
-    response.cookie(AUTH_COOKIE, result.token, {
+    response.cookie(this.env.authCookie, result.token, {
       ...this.cookieOptions(),
       expires: result.expiresAt,
     });
@@ -72,8 +69,8 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    await this.auth.logout(request.cookies?.[AUTH_COOKIE]);
+    await this.auth.logout(request.cookies?.[this.env.authCookie]);
     response.setHeader('Cache-Control', 'no-store');
-    response.clearCookie(AUTH_COOKIE, this.cookieOptions());
+    response.clearCookie(this.env.authCookie, this.cookieOptions());
   }
 }

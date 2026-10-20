@@ -6,21 +6,20 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { isUUID } from 'class-validator';
-import { and, eq, sessions, sql, users, type Database } from '@repo/db';
+import {
+  and,
+  eq,
+  sessions,
+  sql,
+  users,
+  type Database,
+  type User,
+} from '@repo/db';
 import type { UserResponse } from '@repo/contracts/users';
-import { DB } from '../db/db.module.js';
+import { APP_ENV, DB } from '../common/consts/tokens.js';
+import type { AppEnv } from '../common/types/env.js';
+import type { AuthenticatedUser, Claims, SessionUser } from './types/auth.js';
 import type { LoginDto } from './login.dto.js';
-
-export const AUTH_COOKIE = 'orders_access';
-export const TOKEN_SECONDS = 15 * 60;
-export interface AuthenticatedUser extends UserResponse {
-  sessionId: string;
-}
-interface Claims {
-  sub: string;
-  sid: string;
-  exp: number;
-}
 
 @Injectable()
 export class AuthService {
@@ -30,11 +29,12 @@ export class AuthService {
 
   constructor(
     @Inject(DB) private readonly db: Database,
-    @Inject(JwtService) private readonly jwt: JwtService,
-  ) {}
+    private readonly jwt: JwtService,
+    @Inject(APP_ENV) private readonly env: AppEnv,
+  ) { }
 
   async login(input: LoginDto) {
-    let staff;
+    let staff: User | undefined;
     try {
       [staff] = await this.db
         .select()
@@ -57,25 +57,26 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
 
     const sid = crypto.randomUUID();
-    const exp = Math.floor(Date.now() / 1000) + TOKEN_SECONDS;
+    const exp = Math.floor(Date.now() / 1000) + this.env.tokenSeconds;
     try {
-      const token = await this.db.transaction(async (tx) => {
-        await tx
-          .delete(sessions)
-          .where(
-            and(
-              eq(sessions.userId, staff.id),
-              sql`${sessions.expiresAt} <= now()`,
-            ),
-          );
-        await tx
-          .insert(sessions)
-          .values({
-            id: sid,
-            userId: staff.id,
-            expiresAt: new Date(exp * 1000),
-          });
-        return this.jwt.signAsync({ sub: String(staff.id), sid, exp });
+      // Sign first so a signing failure cannot leave a new session behind.
+      const token = await this.jwt.signAsync({
+        sub: String(staff.id),
+        sid,
+        exp,
+      });
+      await this.db
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.userId, staff.id),
+            sql`${sessions.expiresAt} <= now()`,
+          ),
+        );
+      await this.db.insert(sessions).values({
+        id: sid,
+        userId: staff.id,
+        expiresAt: new Date(exp * 1000),
       });
       const user: UserResponse = {
         id: staff.id,
@@ -93,20 +94,22 @@ export class AuthService {
   private async verify(cookie: unknown): Promise<Claims | undefined> {
     if (typeof cookie !== 'string' || cookie.length > 4096) return;
     try {
-      const claims =
+      const { sub, sid, exp } =
         await this.jwt.verifyAsync<Record<string, unknown>>(cookie);
       if (
-        typeof claims.sub !== 'string' ||
-        !/^[1-9]\d*$/.test(claims.sub) ||
-        !Number.isSafeInteger(Number(claims.sub)) ||
-        Number(claims.sub) > 2147483647 ||
-        typeof claims.sid !== 'string' ||
-        !isUUID(claims.sid, '4') ||
-        !Number.isSafeInteger(claims.exp) ||
-        Number(claims.exp) <= Math.floor(Date.now() / 1000)
+        typeof sub !== 'string' ||
+        !/^[1-9]\d{0,9}$/.test(sub) ||
+        Number(sub) > 2147483647
       )
         return;
-      return { sub: claims.sub, sid: claims.sid, exp: Number(claims.exp) };
+      if (typeof sid !== 'string' || !isUUID(sid, '4')) return;
+      if (
+        typeof exp !== 'number' ||
+        !Number.isSafeInteger(exp) ||
+        exp <= Math.floor(Date.now() / 1000)
+      )
+        return;
+      return { sub, sid, exp };
     } catch {
       return;
     }
@@ -115,7 +118,7 @@ export class AuthService {
   async authenticate(cookie: unknown): Promise<AuthenticatedUser> {
     const claims = await this.verify(cookie);
     if (!claims) throw new UnauthorizedException();
-    let staff;
+    let staff: SessionUser | undefined;
     try {
       [staff] = await this.db
         .select({
