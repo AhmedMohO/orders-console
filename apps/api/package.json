@@ -11,8 +11,9 @@
     "dev": "bun --watch src/main.ts",
     "start": "bun src/main.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint --type-aware src/ test/",
+    "lint": "oxlint --type-aware src/ test/ scripts/",
     "test": "bun test ./src ./test",
+    "test:idempotency": "bun test ./test/orders.e2e.spec.ts --test-name-pattern idempotency",
     "test:watch": "bun test --watch ./src ./test",
     "test:cov": "bun test --coverage ./src ./test"
   },

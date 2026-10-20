@@ -20,6 +20,7 @@
 		"db:studio": "bun --env-file=.env run --filter @repo/db studio",
 		"test": "bun run --filter '*' test",
 		"test:api": "bun run --filter api test",
+		"test:idempotency": "bun run --filter api test:idempotency",
 		"typecheck": "bun run --filter '*' typecheck",
 		"lint": "bun run --filter './apps/*' lint",
 		"build": "bun run --filter web build"
