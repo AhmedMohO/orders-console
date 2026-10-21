@@ -24,7 +24,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     @Inject(APP_ENV) private readonly env: AppEnv,
-  ) { }
+  ) {}
 
   private cookieOptions() {
     return {
@@ -44,7 +44,6 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<UserResponse> {
     const result = await this.auth.login(input);
-    response.setHeader('Cache-Control', 'no-store');
     response.cookie(this.env.authCookie, result.token, {
       ...this.cookieOptions(),
       expires: result.expiresAt,
@@ -53,11 +52,7 @@ export class AuthController {
   }
 
   @Get('me')
-  me(
-    @Req() request: AuthRequest,
-    @Res({ passthrough: true }) response: Response,
-  ): UserResponse {
-    response.setHeader('Cache-Control', 'no-store');
+  me(@Req() request: AuthRequest): UserResponse {
     const { id, name, email, role, createdAt } = request.user;
     return { id, name, email, role, createdAt };
   }
@@ -70,7 +65,6 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     await this.auth.logout(request.cookies?.[this.env.authCookie]);
-    response.setHeader('Cache-Control', 'no-store');
     response.clearCookie(this.env.authCookie, this.cookieOptions());
   }
 }

@@ -59,7 +59,7 @@ class ProofController {
 }
 
 @Module({ imports: [AppModule], controllers: [ProofController] })
-class ProofModule { }
+class ProofModule {}
 
 async function makeApp(
   options: {
@@ -387,6 +387,25 @@ test('auth throttles at five attempts and ignores spoofed forwarding headers', a
       .send({ email: admin.email, password: 'wrong' })
       .expect(i < 5 ? 401 : 429);
   }
+});
+
+test('API responses default to no-store on success, auth errors, missing routes and parser errors', async () => {
+  const responses = [
+    await request(app.getHttpServer()).get('/api/health').expect(200),
+    await request(app.getHttpServer()).get('/api/auth/me').expect(401),
+    await request(app.getHttpServer()).get('/api/missing').expect(404),
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({})
+      .expect(403),
+    await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .set('Origin', origin)
+      .send({ email: 'x'.repeat(33000) })
+      .expect(413),
+  ];
+  for (const response of responses)
+    expect(response.headers['cache-control']).toBe('no-store');
 });
 
 test('auth public health is safe, users endpoints are gone, and other routes are private by default', async () => {

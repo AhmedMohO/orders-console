@@ -30,6 +30,9 @@ bun --env-file=.env run --filter api start
 
 All paths include the `/api` prefix.
 
+Shared HTTP setup applies `Cache-Control: no-store` to every API response,
+including parser, authentication, and routing errors.
+
 | Method | Path | Auth | Description |
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Returns `{ "ok": true }` |

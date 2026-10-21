@@ -10,6 +10,7 @@
 		"dev": "bun --env-file=.env run --filter './apps/*' dev",
 		"dev:api": "bun --env-file=.env run --filter api dev",
 		"dev:web": "bun --env-file=.env run --filter web dev",
+		"start:prod": "bun run build && bun --env-file=.env run --parallel --filter './apps/*' start",
 		"db:generate": "bun --env-file=.env run --filter @repo/db generate",
 		"db:migrate": "bun --env-file=.env run --filter @repo/db migrate",
 		"db:test:migrate": "bun packages/db/test/migrate.ts",
@@ -20,7 +21,6 @@
 		"db:studio": "bun --env-file=.env run --filter @repo/db studio",
 		"test": "bun run --filter '*' test",
 		"test:api": "bun run --filter api test",
-		"test:idempotency": "bun run --filter api test:idempotency",
 		"typecheck": "bun run --filter '*' typecheck",
 		"lint": "bun run --filter './apps/*' lint",
 		"build": "bun run --filter web build"

@@ -1,13 +1,16 @@
 import 'reflect-metadata';
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { parseEnv } from 'node:util';
 import { readFileSync } from 'node:fs';
+import { rejects } from 'node:assert/strict';
 import type { NextFunction, Request, Response } from 'express';
 import {
   and,
+  asc,
+  desc,
   eq,
   idempotencyRequests,
   orderItems,
@@ -16,11 +19,14 @@ import {
   users,
   type Database,
   type User,
+  type Order,
 } from '@repo/db';
 import { openTestDatabase } from '@repo/db/test/database.js';
 import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/app.setup.js';
 import { DB } from '../src/common/consts/tokens.js';
+import { OrdersService } from '../src/orders/orders.service.js';
+import { ListOrdersDto } from '../src/orders/dto/list-orders.dto.js';
 
 const origin = 'http://localhost:2001';
 const savedEnv = { ...process.env };
@@ -128,6 +134,430 @@ beforeAll(async () => {
   }
 });
 
+describe('phase 5 list and deletion', () => {
+  const marker = crypto.randomUUID();
+  let fixture: Order[];
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString('base64url');
+  const list = (query: Record<string, unknown> = {}, cookie = cookies[1]) =>
+    request(app.getHttpServer())
+      .get('/api/orders')
+      .set('Cookie', cookie)
+      .query(query);
+  const remove = (id: number | string, cookie = cookies[0]) =>
+    request(app.getHttpServer())
+      .delete('/api/orders/' + id)
+      .set('Cookie', cookie)
+      .set('Origin', origin);
+
+  beforeAll(async () => {
+    fixture = await db
+      .insert(orders)
+      .values(
+        Array.from({ length: 67 }, (_, i) => ({
+          creatorId: staff[i % 2].id,
+          customerName: `${marker} ${i === 0 ? "Élodie O'Brien %_\\" : 'Customer ' + i}`,
+          customerEmail: `${marker}-${i}@example.com`,
+          status: (i % 2 ? 'pending' : 'completed') as 'pending' | 'completed',
+          totalCents:
+            i === 66 ? 2000000000 : i === 0 ? 1 : Math.ceil(i / 4) * 100,
+          createdAt: new Date(Date.UTC(2026, 0, 1, 0, 0, 0, Math.floor(i / 4))),
+        })),
+      )
+      .returning();
+  });
+
+  test('list defaults are bounded, authenticated, shared by both roles and contain only summary fields', async () => {
+    await request(app.getHttpServer()).get('/api/orders').expect(401);
+    const agent = await list({ search: marker }).expect(200);
+    const admin = await list({ search: marker }, cookies[0]).expect(200);
+    expect(admin.body).toEqual(agent.body);
+    expect(agent.body.items).toHaveLength(50);
+    expect(agent.headers['cache-control']).toBe('no-store');
+    expect(Object.keys(agent.body.items[0]).sort()).toEqual(
+      [
+        'id',
+        'creatorId',
+        'customerName',
+        'customerEmail',
+        'status',
+        'totalCents',
+        'createdAt',
+      ].sort(),
+    );
+    const maximum = await list({ search: marker, pageSize: 100 }).expect(200);
+    expect(maximum.body.items).toHaveLength(67);
+    expect(maximum.body.nextCursor).toBeNull();
+    expect(
+      (await list({ search: crypto.randomUUID() }).expect(200)).body,
+    ).toEqual({ items: [], nextCursor: null });
+    expect((await list({ search: '   ' }).expect(200)).body).toEqual(
+      (await list().expect(200)).body,
+    );
+  });
+
+  for (const sort of ['createdAt', 'totalCents'] as const)
+    for (const direction of ['asc', 'desc'] as const)
+      for (const pageSize of [1, 50])
+        for (const filters of [
+          { search: marker },
+          { search: marker, status: 'pending' },
+          {},
+          { status: 'pending' },
+        ])
+          test(`list traverses tied ${sort} ${direction}, size ${pageSize}, filters ${JSON.stringify(filters)}`, async () => {
+            const order = direction === 'asc' ? asc : desc;
+            const expected = (
+              await db
+                .select()
+                .from(orders)
+                .where(
+                  and(
+                    filters.search
+                      ? sql`${orders.customerName} like ${marker + '%'}`
+                      : undefined,
+                    filters.status ? eq(orders.status, 'pending') : undefined,
+                  ),
+                )
+                .orderBy(order(orders[sort]), order(orders.id))
+            ).map((row) => row.id);
+            const ids: number[] = [];
+            let after: string | undefined;
+            do {
+              const response = await list({
+                ...filters,
+                sort,
+                direction,
+                pageSize,
+                after,
+              }).expect(200);
+              expect(response.body.items.length).toBeLessThanOrEqual(pageSize);
+              ids.push(
+                ...response.body.items.map((row: { id: number }) => row.id),
+              );
+              after = response.body.nextCursor ?? undefined;
+              if (after) {
+                const cursor = JSON.parse(
+                  Buffer.from(after, 'base64url').toString(),
+                );
+                expect(cursor.id).toBe(response.body.items.at(-1).id);
+                expect(cursor.value).toBe(response.body.items.at(-1)[sort]);
+              }
+              expect(ids.length).toBeLessThanOrEqual(expected.length);
+            } while (after);
+            expect(ids).toEqual(expected);
+          });
+
+  test('list searches name or email case-insensitively with status and literal LIKE characters', async () => {
+    for (const search of ['ÉLODIE', "O'BRIEN", '%', '_', '\\']) {
+      const result = await list({
+        search,
+        status: 'completed',
+        pageSize: 100,
+      }).expect(200);
+      expect(result.body.items.map((row: { id: number }) => row.id)).toContain(
+        fixture[0].id,
+      );
+      expect(
+        result.body.items.filter((row: { customerName: string }) =>
+          row.customerName.startsWith(marker),
+        ),
+      ).toHaveLength(1);
+    }
+    const email = await list({
+      search: `${marker.toUpperCase()}-1@`,
+      status: 'pending',
+    }).expect(200);
+    expect(email.body.items.map((row: { id: number }) => row.id)).toEqual([
+      fixture[1].id,
+    ]);
+    expect(
+      (await list({ search: `${marker}-1@`, status: 'completed' }).expect(200))
+        .body.items,
+    ).toEqual([]);
+    expect(
+      (await list({ search: "' OR 1=1 --" }).expect(200)).body.items,
+    ).toEqual([]);
+  });
+
+  test('list rejects invalid, repeated and unknown query fields', async () => {
+    for (const query of [
+      { sort: 'id' },
+      { sort: '' },
+      { direction: 'DESC' },
+      { status: 'other' },
+      { status: '' },
+      { pageSize: '0' },
+      { pageSize: '101' },
+      { pageSize: '1.5' },
+      { pageSize: '1e1' },
+      { pageSize: '' },
+      { page: '1' },
+      { offset: '0' },
+      { search: 'x'.repeat(101) },
+      { search: '\0' },
+      { after: '' },
+      { search: ['a', 'b'] },
+      { sort: ['createdAt', 'totalCents'] },
+      { status: ['pending', 'completed'] },
+      { direction: ['asc', 'desc'] },
+      { pageSize: ['1', '2'] },
+      { after: ['a', 'b'] },
+      { unknown: 'value' },
+    ])
+      await list(query).expect(400);
+  });
+
+  test('list rejects malformed cursor encoding, shape, values and every query mismatch', async () => {
+    const first = await list({ search: marker, pageSize: 1 }).expect(200);
+    const valid = JSON.parse(
+      Buffer.from(first.body.nextCursor, 'base64url').toString(),
+    );
+    expect(valid).not.toHaveProperty('v');
+    const malformed = [
+      'x'.repeat(2049),
+      '***',
+      first.body.nextCursor + '=',
+      'Zh',
+      Buffer.from([0xff]).toString('base64url'),
+      Buffer.from('{').toString('base64url'),
+      ...[
+        null,
+        [],
+        {},
+        { ...valid, extra: true },
+        { ...valid, v: 1 },
+        ...[0, -1, 1.5, 2147483648, '1', null].map((id) => ({ ...valid, id })),
+        ...[
+          'invalid',
+          '2026-02-30T00:00:00.000Z',
+          '0000-01-01T00:00:00.000Z',
+          '2026-01-01T00:00:00Z',
+          '2026-01-01T00:00:00.000+00:00',
+          1,
+        ].map((value) => ({ ...valid, value })),
+        ...[
+          'sort',
+          'direction',
+          'search',
+          'status',
+          'pageSize',
+          'value',
+          'id',
+        ].map((key) => {
+          const copy = { ...valid };
+          delete copy[key];
+          return copy;
+        }),
+      ].map(encode),
+    ];
+    for (const after of malformed)
+      await list({ search: marker, pageSize: 1, after }).expect(400);
+    for (const query of [
+      { search: marker.toUpperCase() },
+      { search: 'other' },
+      { status: 'pending' },
+      { sort: 'totalCents' },
+      { direction: 'asc' },
+      { pageSize: 2 },
+    ])
+      await list({
+        search: marker,
+        pageSize: 1,
+        ...query,
+        after: first.body.nextCursor,
+      }).expect(400);
+    const amount = JSON.parse(
+      Buffer.from(
+        (
+          await list({
+            search: marker,
+            sort: 'totalCents',
+            pageSize: 1,
+          }).expect(200)
+        ).body.nextCursor,
+        'base64url',
+      ).toString(),
+    );
+    for (const value of [0, -1, 0.5, 2000000001, '100', null])
+      await list({
+        search: marker,
+        sort: 'totalCents',
+        pageSize: 1,
+        after: encode({ ...amount, value }),
+      }).expect(400);
+    const beyond = await list({
+      search: marker,
+      sort: 'totalCents',
+      direction: 'asc',
+      pageSize: 1,
+      after: encode({
+        ...amount,
+        direction: 'asc',
+        value: 2000000000,
+        id: 2147483647,
+      }),
+    }).expect(200);
+    expect(beyond.body).toEqual({ items: [], nextCursor: null });
+    await list({
+      search: ` ${marker} `,
+      pageSize: 1,
+      sort: 'createdAt',
+      direction: 'desc',
+      after: first.body.nextCursor,
+    }).expect(200);
+  });
+
+  test('idempotency replay after HTTP deletion does not recreate order; agent denial changes nothing', async () => {
+    const key = crypto.randomUUID();
+    const created = await create(key).expect(201);
+    const id = created.body.id;
+    const before = await counts();
+    await remove(id, cookies[1]).expect(403);
+    expect(await counts()).toEqual(before);
+    expect(
+      await db.select().from(orderItems).where(eq(orderItems.orderId, id)),
+    ).toHaveLength(2);
+    for (const bad of ['0', '-1', '1.5', '1e2', '2147483648', 'abc'])
+      await remove(bad).expect(400);
+    await request(app.getHttpServer())
+      .delete('/api/orders/' + id)
+      .set('Origin', origin)
+      .expect(401);
+    for (const hostile of [undefined, 'null', 'https://hostile.example']) {
+      const call = request(app.getHttpServer())
+        .delete('/api/orders/' + id)
+        .set('Cookie', cookies[0]);
+      if (hostile) call.set('Origin', hostile);
+      await call.expect(403);
+    }
+    await remove(id).expect(204);
+    await remove(id).expect(404);
+    expect(await db.select().from(orders).where(eq(orders.id, id))).toEqual([]);
+    expect(
+      await db.select().from(orderItems).where(eq(orderItems.orderId, id)),
+    ).toEqual([]);
+    expect((await create(key).expect(201)).body).toEqual(created.body);
+    expect(await counts()).toEqual({
+      orders: before.orders - 1,
+      receipts: before.receipts,
+    });
+  });
+
+  test('database errors are safe 503s and invalid cursors are rejected before list SQL', async () => {
+    const service = new OrdersService(db);
+    const failure = spyOn(db.$client, 'query').mockImplementation(() => {
+      throw new Error('sensitive SQL and connection details');
+    });
+    try {
+      await rejects(service.list(new ListOrdersDto()), {
+        status: 503,
+        message: 'Order list unavailable',
+      });
+      await rejects(service.remove(fixture[0].id), {
+        status: 503,
+        message: 'Order deletion unavailable',
+      });
+      await rejects(
+        service.list(Object.assign(new ListOrdersDto(), { after: '***' })),
+        { status: 400 },
+      );
+    } finally {
+      failure.mockRestore();
+    }
+    expect(
+      await db.select().from(orders).where(eq(orders.id, fixture[0].id)),
+    ).toHaveLength(1);
+  });
+
+  test('live cursors survive deleted anchors and insertions without losing unchanged rows', async () => {
+    const first = await list({
+      search: marker,
+      sort: 'totalCents',
+      direction: 'asc',
+      pageSize: 1,
+    }).expect(200);
+    const second = await list({
+      search: marker,
+      sort: 'totalCents',
+      direction: 'asc',
+      pageSize: 1,
+      after: first.body.nextCursor,
+    }).expect(200);
+    const anchor = second.body.items[0];
+    await remove(anchor.id).expect(204);
+    const inserted = await db
+      .insert(orders)
+      .values(
+        [1, 150].map((amount) => ({
+          creatorId: staff[0].id,
+          customerName: marker + ' new',
+          customerEmail: marker + '@example.com',
+          totalCents: amount,
+          createdAt: new Date(),
+        })),
+      )
+      .returning();
+    const rest = await list({
+      search: marker,
+      sort: 'totalCents',
+      direction: 'asc',
+      pageSize: 1,
+      after: second.body.nextCursor,
+    }).expect(200);
+    expect(rest.body.items[0].id).toBe(fixture[2].id);
+    const remainingIds: number[] = [];
+    let after = second.body.nextCursor;
+    while (after) {
+      const page = await list({
+        search: marker,
+        sort: 'totalCents',
+        direction: 'asc',
+        pageSize: 1,
+        after,
+      }).expect(200);
+      remainingIds.push(
+        ...page.body.items.map((row: { id: number }) => row.id),
+      );
+      after = page.body.nextCursor;
+      expect(remainingIds.length).toBeLessThanOrEqual(fixture.length);
+    }
+    const expected = fixture
+      .slice(2)
+      .sort((a, b) => a.totalCents - b.totalCents || a.id - b.id);
+    expect(remainingIds).toEqual(
+      [...expected, inserted[1]]
+        .sort((a, b) => a.totalCents - b.totalCents || a.id - b.id)
+        .map((row) => row.id),
+    );
+    expect(remainingIds).not.toContain(inserted[0].id);
+    expect(
+      (
+        await list({
+          search: marker,
+          sort: 'totalCents',
+          direction: 'asc',
+          pageSize: 100,
+        }).expect(200)
+      ).body.items.map((row: { id: number }) => row.id),
+    ).toContain(inserted[0].id);
+    await db
+      .delete(orders)
+      .where(sql`${orders.customerName} like ${marker + '%'}`);
+    expect(
+      (
+        await list({
+          search: marker,
+          sort: 'totalCents',
+          direction: 'asc',
+          pageSize: 1,
+          after: rest.body.nextCursor,
+        }).expect(200)
+      ).body,
+    ).toEqual({ items: [], nextCursor: null });
+  });
+});
+
 afterAll(async () => {
   try {
     await Promise.all(apps.map((instance) => instance.close()));
@@ -213,9 +643,9 @@ test('idempotency parallel create returns one order', async () => {
   expect(first.headers['cache-control']).toBe('no-store');
   console.info(
     `Idempotency proof: staff ${staff[0].id}; key ${key}\n` +
-    `HTTP statuses: ${responses.map(({ status }) => status).join(', ')}\n` +
-    `Order IDs: ${responses.map(({ body }) => body.id).join(', ')}\n` +
-    `SQL order count ${rows.length}; items ${items.length}; receipts ${receipts.length}; stored status ${receipts[0].responseStatus}; stored response matches all 10 HTTP bodies`,
+      `HTTP statuses: ${responses.map(({ status }) => status).join(', ')}\n` +
+      `Order IDs: ${responses.map(({ body }) => body.id).join(', ')}\n` +
+      `SQL order count ${rows.length}; items ${items.length}; receipts ${receipts.length}; stored status ${receipts[0].responseStatus}; stored response matches all 10 HTTP bodies`,
   );
 });
 

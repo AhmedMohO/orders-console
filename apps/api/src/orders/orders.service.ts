@@ -2,23 +2,89 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import {
   and,
+  asc,
+  desc,
   eq,
   idempotencyRequests,
   orderItems,
   orders,
+  sql,
   type Database,
 } from '@repo/db';
-import type { OrderResponse } from '@repo/contracts/orders';
+import type { OrderListResponse, OrderResponse } from '@repo/contracts/orders';
 import { DB } from '../common/consts/tokens.js';
 import type { CreateOrderDto } from './dto/create-order.dto.js';
+import type { ListOrdersDto } from './dto/list-orders.dto.js';
+import { decodeCursor, encodeCursor } from './cursor.js';
 
 @Injectable()
 export class OrdersService {
   constructor(@Inject(DB) private readonly db: Database) { }
+
+  async list(query: ListOrdersDto): Promise<OrderListResponse> {
+    const cursor = decodeCursor(query);
+    const column = orders[query.sort];
+    const order = query.direction === 'asc' ? asc : desc;
+    const pattern = '%' + query.search.replace(/[\\%_]/g, '\\$&') + '%';
+    try {
+      const rows = await this.db
+        .select({
+          id: orders.id,
+          creatorId: orders.creatorId,
+          customerName: orders.customerName,
+          customerEmail: orders.customerEmail,
+          status: orders.status,
+          totalCents: orders.totalCents,
+          createdAt: orders.createdAt,
+        })
+        .from(orders)
+        .where(
+          and(
+            query.status ? eq(orders.status, query.status) : undefined,
+            query.search
+              ? sql`(${orders.customerName} ilike ${pattern} or ${orders.customerEmail} ilike ${pattern})`
+              : undefined,
+            cursor
+              ? query.direction === 'asc'
+                ? sql`(${column}, ${orders.id}) > (${cursor.value}, ${cursor.id})`
+                : sql`(${column}, ${orders.id}) < (${cursor.value}, ${cursor.id})`
+              : undefined,
+          ),
+        )
+        .orderBy(order(column), order(orders.id))
+        .limit(query.pageSize + 1);
+      const items = rows
+        .slice(0, query.pageSize)
+        .map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
+      return {
+        items,
+        nextCursor:
+          rows.length > query.pageSize
+            ? encodeCursor(query, items[items.length - 1])
+            : null,
+      };
+    } catch {
+      throw new ServiceUnavailableException('Order list unavailable');
+    }
+  }
+
+  async remove(orderId: number): Promise<void> {
+    let deleted: { id: number }[];
+    try {
+      deleted = await this.db
+        .delete(orders)
+        .where(eq(orders.id, orderId))
+        .returning({ id: orders.id });
+    } catch {
+      throw new ServiceUnavailableException('Order deletion unavailable');
+    }
+    if (!deleted.length) throw new NotFoundException('Order not found');
+  }
 
   async create(
     creatorId: number,
