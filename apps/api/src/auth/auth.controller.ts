@@ -30,7 +30,7 @@ export class AuthController {
     return {
       httpOnly: true,
       sameSite: 'lax' as const,
-      path: '/api',
+      path: '/',
       secure: this.env.nodeEnv === 'production',
     };
   }
