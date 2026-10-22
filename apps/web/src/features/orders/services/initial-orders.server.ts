@@ -2,15 +2,20 @@ import "server-only";
 
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 import type { OrderListResponse } from "@repo/contracts/orders";
+import { createLoader, type SearchParams } from "nuqs/server";
 import { loadServerSession } from "@/features/auth/services/session.server";
 import { serverFetch } from "@/lib/api.server";
-import { initialOrderQuery } from "../schemas/order-query.schema";
+import { orderQueryParsers } from "../schemas/order-query.schema";
 
-export async function loadInitialOrders() {
-  const params = new URLSearchParams({
-    ...initialOrderQuery,
-    pageSize: String(initialOrderQuery.pageSize),
-  });
+const loadOrderQuery = createLoader(orderQueryParsers);
+
+export async function loadInitialOrders(searchParams: SearchParams = {}) {
+  const parsed = loadOrderQuery(searchParams);
+  const query = { ...parsed, search: parsed.search.trim(), status: parsed.status ?? undefined };
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
   const [user, ordersResponse] = await Promise.all([
     loadServerSession(),
     serverFetch(`/orders?${params}`),
@@ -20,7 +25,7 @@ export async function loadInitialOrders() {
   const orders = await ordersResponse.json() as OrderListResponse;
   const client = new QueryClient();
   client.setQueryData(["session"], user);
-  client.setQueryData(["orders", user.id, initialOrderQuery], {
+  client.setQueryData(["orders", user.id, query], {
     pages: [orders],
     pageParams: [undefined],
   });

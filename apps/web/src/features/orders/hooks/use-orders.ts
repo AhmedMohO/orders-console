@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import type { OrderQuery } from "@repo/contracts/orders";
 import { errorMessage } from "@/lib/api";
 import { listOrders } from "../services/api";
@@ -13,6 +14,11 @@ export function useOrders(query: OrderQuery, staffId: number) {
       listOrders({ ...query, after: pageParam }, signal),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
+
+  useEffect(() => {
+    // Discard departed filters after subscription, preserving the hydrated active query.
+    client.removeQueries({ queryKey: ["orders", staffId], type: "inactive" });
+  }, [client, staffId, query.search, query.status, query.sort, query.direction, query.pageSize, query.after]);
 
   function previous() {
     if (result.isFetching || !result.data || result.data.pages.length < 2)

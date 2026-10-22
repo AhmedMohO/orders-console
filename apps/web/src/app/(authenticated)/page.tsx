@@ -4,7 +4,7 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import { OrdersWorkspace } from "@/features/orders/components/orders-workspace";
 import { loadInitialOrders } from "@/features/orders/services/initial-orders.server";
 
-export default function Home() {
+export default function Home({ searchParams }: PageProps<"/">) {
 	return (
 		<Suspense
 			fallback={
@@ -12,13 +12,13 @@ export default function Home() {
 					<p role="status">Loading Orders Console…</p>
 				</main>
 			}>
-			<InitialOrders />
+			<InitialOrders searchParams={searchParams} />
 		</Suspense>
 	);
 }
 
-async function InitialOrders() {
-	const state = await loadInitialOrders();
+async function InitialOrders({ searchParams }: Pick<PageProps<"/">, "searchParams">) {
+	const state = await loadInitialOrders(await searchParams);
 	if (!state) redirect("/login");
 	return (
 		<HydrationBoundary state={state}>

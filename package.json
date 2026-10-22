@@ -21,5 +21,8 @@
 		"typecheck": "bun run --filter '*' typecheck",
 		"lint": "bun run --filter './apps/*' lint",
 		"build": "bun run --filter web build"
+	},
+	"dependencies": {
+		"nuqs": "^2.10.2"
 	}
 }

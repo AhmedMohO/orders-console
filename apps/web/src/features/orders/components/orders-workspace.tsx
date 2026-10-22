@@ -2,16 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-	orderStatuses,
-	type OrderQuery,
-	type OrderSummary,
-} from "@repo/contracts/orders";
+import { orderStatuses, type OrderSummary } from "@repo/contracts/orders";
 import { useAuthenticatedShell } from "@/components/layout/authenticated-shell";
 import { ApiError, errorMessage } from "@/lib/api";
 import { useDebouncedSearch } from "../../../shared/hooks/use-debounced-search";
 import { useDeleteOrder } from "../hooks/use-delete-order";
-import { initialOrderQuery } from "../schemas/order-query.schema";
+import { orderQueryParsers } from "../schemas/order-query.schema";
+import { useQueryStates } from "nuqs";
 import { OrdersTable } from "./orders-table";
 import { DeleteOrderDialog } from "./delete-order-dialog";
 import { useOrders } from "../hooks/use-orders";
@@ -26,18 +23,11 @@ const OrderForm = dynamic(
 export function OrdersWorkspace() {
 	const { user, onUnauthorized, loggingOut, onBusyChange } =
 		useAuthenticatedShell();
-	const [search, setSearch] = useState(initialOrderQuery.search);
+	const [{ search, status, sort, direction, pageSize }, setQuery] = useQueryStates(
+		orderQueryParsers,
+		{ history: "replace", shallow: true },
+	);
 	const debouncedSearch = useDebouncedSearch(search);
-	const [status, setStatus] = useState<NonNullable<OrderQuery["status"]> | "">(
-		"",
-	);
-	const [sort, setSort] = useState<NonNullable<OrderQuery["sort"]>>(
-		initialOrderQuery.sort,
-	);
-	const [direction, setDirection] = useState<
-		NonNullable<OrderQuery["direction"]>
-	>(initialOrderQuery.direction);
-	const [pageSize, setPageSize] = useState(initialOrderQuery.pageSize);
 	const [actionError, setActionError] = useState("");
 	const [orderToDelete, setOrderToDelete] = useState<OrderSummary | null>(null);
 	const [deleteError, setDeleteError] = useState("");
@@ -54,7 +44,7 @@ export function OrdersWorkspace() {
 	const list = useOrders(
 		{
 			search: debouncedSearch,
-			status: status || undefined,
+			status: status ?? undefined,
 			sort,
 			direction,
 			pageSize,
@@ -121,7 +111,7 @@ export function OrdersWorkspace() {
 									maxLength={100}
 									placeholder="Name or email"
 									value={search}
-									onChange={(event) => setSearch(event.target.value)}
+									onChange={(event) => void setQuery({ search: event.target.value })}
 									disabled={loggingOut}
 								/>
 							</div>
@@ -129,9 +119,11 @@ export function OrdersWorkspace() {
 								<label htmlFor="status">Status</label>
 								<select
 									id="status"
-									value={status}
+									value={status ?? ""}
 									onChange={(event) =>
-										setStatus(event.target.value as typeof status)
+										void setQuery({
+											status: (event.target.value as (typeof orderStatuses)[number]) || null,
+										})
 									}
 									disabled={loggingOut}>
 									<option value="">All statuses</option>
@@ -148,7 +140,7 @@ export function OrdersWorkspace() {
 									id="sort"
 									value={sort}
 									onChange={(event) =>
-										setSort(event.target.value as typeof sort)
+										void setQuery({ sort: event.target.value as typeof sort })
 									}
 									disabled={loggingOut}>
 									<option value="createdAt">Date</option>
@@ -161,7 +153,7 @@ export function OrdersWorkspace() {
 									id="direction"
 									value={direction}
 									onChange={(event) =>
-										setDirection(event.target.value as typeof direction)
+										void setQuery({ direction: event.target.value as typeof direction })
 									}
 									disabled={loggingOut}>
 									<option value="desc">Descending</option>
@@ -234,8 +226,10 @@ export function OrdersWorkspace() {
 								<select
 									id="page-size"
 									className="w-auto"
-									value={pageSize}
-									onChange={(event) => setPageSize(Number(event.target.value))}
+									value={String(pageSize)}
+									onChange={(event) =>
+										void setQuery({ pageSize: Number(event.target.value) })
+									}
 									disabled={loggingOut}>
 									<option value="10">10</option>
 									<option value="25">25</option>
