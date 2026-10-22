@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { dehydrate, HydrationBoundary, QueryClient } from "@tanstack/react-query";
 import { AuthenticatedShell } from "@/components/layout/authenticated-shell";
@@ -14,7 +13,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 }
 
 async function SessionLayout({ children }: { children: React.ReactNode }) {
-  const user = await loadServerSession((await cookies()).toString());
+  const user = await loadServerSession();
   if (!user) redirect("/login");
   const client = new QueryClient();
   client.setQueryData(["session"], user);
