@@ -1,5 +1,5 @@
 import { formatMoney } from "../../../shared/utils/format-money";
-import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { buildOrderInput, parseMoney } from "../utils/order-input";
 import { useCreateOrder } from "../hooks/use-create-order";
@@ -27,7 +27,6 @@ export function OrderForm({
 	const create = useCreateOrder(staffId, onCreated, onUnauthorized);
 	const saved = create.attempt?.input;
 	const {
-		register,
 		control,
 		handleSubmit,
 		reset,
@@ -46,6 +45,7 @@ export function OrderForm({
 					})),
 				}
 			: emptyDraft(),
+		mode: "onTouched",
 	});
 
 	const { fields, append, remove } = useFieldArray({ control, name: "items" });
@@ -129,16 +129,22 @@ export function OrderForm({
 			<form onSubmit={submit} noValidate>
 				<fieldset disabled={locked}>
 					<label htmlFor="customer-name">Customer name</label>
-					<input
-						id="customer-name"
-						autoComplete="name"
-						maxLength={100}
-						required
-						{...register("customerName")}
-						aria-invalid={Boolean(errors.customerName)}
-						aria-describedby={
-							errors.customerName ? "customer-name-error" : undefined
-						}
+					<Controller
+						control={control}
+						name="customerName"
+						render={({ field }) => (
+							<input
+								id="customer-name"
+								autoComplete="name"
+								maxLength={100}
+								required
+								{...field}
+								aria-invalid={Boolean(errors.customerName)}
+								aria-describedby={
+									errors.customerName ? "customer-name-error" : undefined
+								}
+							/>
+						)}
 					/>
 					{errors.customerName && (
 						<p
@@ -151,17 +157,23 @@ export function OrderForm({
 					<label htmlFor="customer-email" className="mt-4">
 						Customer email
 					</label>
-					<input
-						id="customer-email"
-						type="email"
-						autoComplete="email"
-						maxLength={254}
-						required
-						{...register("customerEmail")}
-						aria-invalid={Boolean(errors.customerEmail)}
-						aria-describedby={
-							errors.customerEmail ? "customer-email-error" : undefined
-						}
+					<Controller
+						control={control}
+						name="customerEmail"
+						render={({ field }) => (
+							<input
+								id="customer-email"
+								type="email"
+								autoComplete="email"
+								maxLength={254}
+								required
+								{...field}
+								aria-invalid={Boolean(errors.customerEmail)}
+								aria-describedby={
+									errors.customerEmail ? "customer-email-error" : undefined
+								}
+							/>
+						)}
 					/>
 					{errors.customerEmail && (
 						<p
@@ -188,17 +200,23 @@ export function OrderForm({
 							<label htmlFor={`description-${index}`}>
 								Description {index + 1}
 							</label>
-							<input
-								id={`description-${index}`}
-								maxLength={200}
-								required
-								{...register(`items.${index}.description`)}
-								aria-invalid={Boolean(errors.items?.[index]?.description)}
-								aria-describedby={
-									errors.items?.[index]?.description
-										? `description-${index}-error`
-										: undefined
-								}
+							<Controller
+								control={control}
+								name={`items.${index}.description`}
+								render={({ field }) => (
+									<input
+										id={`description-${index}`}
+										maxLength={200}
+										required
+										{...field}
+										aria-invalid={Boolean(errors.items?.[index]?.description)}
+										aria-describedby={
+											errors.items?.[index]?.description
+												? `description-${index}-error`
+												: undefined
+										}
+									/>
+								)}
 							/>
 							{errors.items?.[index]?.description && (
 								<p
@@ -213,20 +231,26 @@ export function OrderForm({
 									<label htmlFor={`quantity-${index}`}>
 										Quantity {index + 1}
 									</label>
-									<input
-										id={`quantity-${index}`}
-										type="number"
-										min="1"
-										max="999"
-										step="1"
-										required
-										{...register(`items.${index}.quantity`)}
-										aria-invalid={Boolean(errors.items?.[index]?.quantity)}
-										aria-describedby={
-											errors.items?.[index]?.quantity
-												? `quantity-${index}-error`
-												: undefined
-										}
+									<Controller
+										control={control}
+										name={`items.${index}.quantity`}
+										render={({ field }) => (
+											<input
+												id={`quantity-${index}`}
+												type="number"
+												min="1"
+												max="999"
+												step="1"
+												required
+												{...field}
+												aria-invalid={Boolean(errors.items?.[index]?.quantity)}
+												aria-describedby={
+													errors.items?.[index]?.quantity
+														? `quantity-${index}-error`
+														: undefined
+												}
+											/>
+										)}
 									/>
 									{errors.items?.[index]?.quantity && (
 										<p
@@ -247,20 +271,28 @@ export function OrderForm({
 											className="absolute inset-y-0 left-3 flex items-center text-muted">
 											EGP
 										</span>
-										<input
-											id={`price-${index}`}
-											className="pl-12"
-											inputMode="decimal"
-											placeholder="0.00"
-											maxLength={9}
-											required
-											{...register(`items.${index}.unitPrice`)}
-											aria-invalid={Boolean(errors.items?.[index]?.unitPrice)}
-											aria-describedby={
-												errors.items?.[index]?.unitPrice
-													? `price-${index}-error`
-													: undefined
-											}
+										<Controller
+											control={control}
+											name={`items.${index}.unitPrice`}
+											render={({ field }) => (
+												<input
+													id={`price-${index}`}
+													className="pl-12"
+													inputMode="decimal"
+													placeholder="0.00"
+													maxLength={9}
+													required
+													{...field}
+													aria-invalid={Boolean(
+														errors.items?.[index]?.unitPrice,
+													)}
+													aria-describedby={
+														errors.items?.[index]?.unitPrice
+															? `price-${index}-error`
+															: undefined
+													}
+												/>
+											)}
 										/>
 									</div>
 									{errors.items?.[index]?.unitPrice && (

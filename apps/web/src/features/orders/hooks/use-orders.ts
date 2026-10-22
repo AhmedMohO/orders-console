@@ -12,7 +12,6 @@ export function useOrders(query: OrderQuery, staffId: number) {
     queryFn: ({ pageParam, signal }) =>
       listOrders({ ...query, after: pageParam }, signal),
     getNextPageParam: (last) => last.nextCursor ?? undefined,
-    gcTime: 0,
   });
 
   function previous() {
@@ -24,10 +23,11 @@ export function useOrders(query: OrderQuery, staffId: number) {
     });
   }
 
+  const isServer = typeof window === "undefined";
   return {
-    data: result.data?.pages.at(-1),
-    page: result.data?.pages.length ?? 1,
-    loading: result.isPending || result.isFetching,
+    data: isServer ? result.data?.pages[0] : result.data?.pages.at(-1),
+    page: isServer ? 1 : (result.data?.pages.length ?? 1),
+    loading: !result.data || result.isFetchingNextPage,
     error: result.error ? errorMessage(result.error) : "",
     next: result.fetchNextPage,
     previous,

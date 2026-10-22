@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { errorMessage } from "@/lib/api";
 import { useLogin } from "../hooks/use-login";
@@ -10,12 +10,13 @@ export function LoginForm() {
 	const login = useLogin();
 	const error = login.error ? errorMessage(login.error) : "";
 	const {
-		register,
+		control,
 		handleSubmit,
 		formState: { errors, isSubmitting },
 	} = useForm({
 		resolver: zodResolver(loginSchema),
 		defaultValues: { email: "", password: "" },
+		mode: "onTouched",
 	});
 	const busy = isSubmitting || login.isPending;
 
@@ -44,15 +45,21 @@ export function LoginForm() {
 				<form onSubmit={submit} noValidate className="mt-6 mb-5">
 					<fieldset disabled={busy}>
 						<label htmlFor="email">Email</label>
-						<input
-							id="email"
-							{...register("email")}
-							type="email"
-							autoComplete="username"
-							maxLength={254}
-							required
-							aria-invalid={Boolean(errors.email)}
-							aria-describedby={errors.email ? "email-error" : undefined}
+						<Controller
+							control={control}
+							name="email"
+							render={({ field }) => (
+								<input
+									id="email"
+									{...field}
+									type="email"
+									autoComplete="username"
+									maxLength={254}
+									required
+									aria-invalid={Boolean(errors.email)}
+									aria-describedby={errors.email ? "email-error" : undefined}
+								/>
+							)}
 						/>
 						{errors.email && (
 							<p id="email-error" role="alert" className="mt-1 text-error">
@@ -62,15 +69,23 @@ export function LoginForm() {
 						<label htmlFor="password" className="mt-4">
 							Password
 						</label>
-						<input
-							id="password"
-							{...register("password")}
-							type="password"
-							autoComplete="current-password"
-							maxLength={1024}
-							required
-							aria-invalid={Boolean(errors.password)}
-							aria-describedby={errors.password ? "password-error" : undefined}
+						<Controller
+							control={control}
+							name="password"
+							render={({ field }) => (
+								<input
+									id="password"
+									{...field}
+									type="password"
+									autoComplete="current-password"
+									maxLength={1024}
+									required
+									aria-invalid={Boolean(errors.password)}
+									aria-describedby={
+										errors.password ? "password-error" : undefined
+									}
+								/>
+							)}
 						/>
 						{errors.password && (
 							<p id="password-error" role="alert" className="mt-1 text-error">

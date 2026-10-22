@@ -1,4 +1,4 @@
-import { dateFormatter } from "../../../shared/utils/date-formater";
+import { dateFormatter, timeFormatter } from "../../../shared/utils/date-formater";
 import { formatMoney } from "../../../shared/utils/format-money";
 import type { OrderSummary } from "@repo/contracts/orders";
 
@@ -58,7 +58,10 @@ export function OrdersTable({
 								{formatMoney(order.totalCents)}
 							</td>
 							<td className="whitespace-nowrap">
-								{dateFormatter.format(new Date(order.createdAt))}
+								<div>{dateFormatter.format(new Date(order.createdAt))}</div>
+								<div className="text-xs text-muted tabular-nums">
+									{timeFormatter.format(new Date(order.createdAt))}
+								</div>
 							</td>
 							{admin && (
 								<td>
@@ -114,7 +117,8 @@ export function OrdersTableSkeleton({
 						<div className="ml-auto h-4 w-16 rounded bg-border" />
 					</td>
 					<td>
-						<div className="h-4 w-28 rounded bg-border" />
+						<div className="h-4 w-24 rounded bg-border" />
+						<div className="mt-1 h-3 w-14 rounded bg-border" />
 					</td>
 					{admin && (
 						<td>

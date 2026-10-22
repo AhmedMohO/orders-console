@@ -4,7 +4,7 @@ Next.js frontend, NestJS API, and PostgreSQL with Drizzle.
 
 ## Install and run
 
-Requires Bun 1.4+, Node.js 24+, and local PostgreSQL. Run commands from the repository root.
+Requires [Bun](https://bun.sh) 1.4+, Node.js 24+, and local PostgreSQL. Run commands from the repository root.
 
 1. Create a database user and database:
 

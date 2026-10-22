@@ -24,7 +24,8 @@ const OrderForm = dynamic(
 );
 
 export function OrdersWorkspace() {
-	const { user, onUnauthorized, loggingOut, onBusyChange } = useAuthenticatedShell();
+	const { user, onUnauthorized, loggingOut, onBusyChange } =
+		useAuthenticatedShell();
 	const [search, setSearch] = useState(initialOrderQuery.search);
 	const debouncedSearch = useDebouncedSearch(search);
 	const [status, setStatus] = useState<NonNullable<OrderQuery["status"]> | "">(
@@ -182,7 +183,7 @@ export function OrdersWorkspace() {
 							</button>
 						</div>
 						<div
-							className="max-h-160 min-h-0 flex-1 overflow-auto overscroll-contain lg:max-h-none"
+							className="max-h-160 min-h-0 flex-1 overflow-auto lg:max-h-none"
 							aria-busy={list.loading}
 							tabIndex={0}
 							aria-label="Scrollable order results">
@@ -242,7 +243,7 @@ export function OrdersWorkspace() {
 									<option value="100">100</option>
 								</select>
 							</label>
-							<div className="flex flex-wrap items-center gap-2.5 max-sm:w-full max-sm:justify-between">
+							<div className="flex flex-wrap items-center gap-2.5">
 								<span className="whitespace-nowrap text-muted">
 									Page {list.page}
 								</span>
