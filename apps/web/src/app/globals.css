@@ -1,26 +1,84 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+	--color-background: #f3f6f9;
+	--color-foreground: #172b3a;
+	--color-muted: #526475;
+	--color-border: #d7e0e8;
+	--color-accent: #1559a5;
+	--color-accent-hover: #10477f;
+	--color-control-border: #b9c8d5;
+	--color-control-disabled: #f0f3f6;
+	--color-control-hover: #eaf1f8;
+	--color-control-hover-border: #b2c7da;
+	--color-placeholder: #647687;
+	--color-focus: #2777cc;
+	--color-filter: #fafcfe;
+	--color-table-header: #f4f7fa;
+	--color-table-heading: #45596a;
+	--color-table-border: #e5ebf0;
+	--color-table-hover: #fafcff;
+	--color-role: #214e76;
+	--color-role-surface: #e9f0f7;
+	--color-danger: #9e3033;
+	--color-danger-hover: #802629;
+	--color-error: #963337;
+	--color-error-surface: #fff0ef;
+	--color-warning: #e4ca8b;
+	--color-warning-surface: #fff8e8;
+	--color-status-pending: #82500c;
+	--color-status-pending-surface: #fff2d7;
+	--color-status-processing: #15538b;
+	--color-status-processing-surface: #e8f2fc;
+	--color-status-completed: #1f663e;
+	--color-status-completed-surface: #e8f4ed;
+	--color-status-cancelled: #6b4d58;
+	--color-status-cancelled-surface: #f3eaee;
+	--font-sans: var(--font-geist-sans), Arial, sans-serif;
+	--font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+	body {
+		@apply bg-background font-sans text-sm leading-normal text-foreground;
+	}
+	button {
+		@apply min-h-10 cursor-pointer rounded-md border border-border bg-white px-3 py-2 font-medium text-foreground;
+		@apply enabled:hover:border-control-hover-border enabled:hover:bg-control-hover disabled:cursor-not-allowed disabled:opacity-55;
+	}
+	input,
+	select {
+		@apply min-h-10 w-full min-w-0 rounded-md border border-control-border bg-white px-3 py-2 text-foreground disabled:bg-control-disabled;
+	}
+	input::placeholder {
+		@apply text-placeholder;
+	}
+	:focus-visible {
+		@apply outline-3 outline-offset-3 outline-focus;
+	}
+	label {
+		@apply mb-1 block text-sm font-semibold;
+	}
+	fieldset {
+		@apply m-0 min-w-0 border-0 p-0;
+	}
+	h1 {
+		@apply text-3xl leading-tight font-semibold tracking-tight;
+	}
+	h2 {
+		@apply text-xl font-semibold;
+	}
+	h3 {
+		@apply text-sm font-semibold;
+	}
+	th {
+		@apply sticky top-0 z-10 bg-table-header font-semibold whitespace-nowrap text-table-heading;
+	}
+	th,
+	td {
+		@apply border-b border-table-border px-3.5 py-3 align-middle;
+	}
+	tbody tr {
+		@apply hover:bg-table-hover;
+	}
 }
