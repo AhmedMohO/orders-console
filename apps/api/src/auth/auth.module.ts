@@ -27,7 +27,11 @@ import { RolesGuard } from './guards/roles.guard.js';
         },
       }),
     }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 5 }]),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 60000, limit: 5 }],
+      errorMessage: (_context, { timeToBlockExpire }) =>
+        `Too many login attempts. Please try again in ${timeToBlockExpire} second${timeToBlockExpire === 1 ? '' : 's'}.`,
+    }),
   ],
   controllers: [AuthController],
   providers: [

@@ -98,5 +98,6 @@ Suggestion: I suggest hiding cancelled orders by default instead of deleting the
 
 - Registration, password reset, MFA, and refresh tokens: seeded staff accounts keep the scope small; sessions expire after 15 minutes.
 - Snapshot pagination, page-number jumps, and logout-all-devices: cursor navigation and revoking the current session cover the required workflow.
+- Optimistic updates: Given the time constraints, I prioritized following best practices and delivering the core application with the fewest possible logic and business errors.
 
 See [DECISIONS.md](DECISIONS.md) for design choices and AI use.

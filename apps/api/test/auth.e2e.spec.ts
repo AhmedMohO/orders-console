@@ -239,12 +239,12 @@ test('auth accepts both demo credentials, normalizes email and returns only safe
   }
 });
 
-test('auth cookies use bounded expiry, HttpOnly, Lax, /api and production Secure', async () => {
+test('auth cookies reach server-rendered pages and retain bounded expiry and security flags', async () => {
   const response = await login().expect(200);
   const raw = (response.headers['set-cookie'] as unknown as string[])[0];
   expect(raw).toContain('HttpOnly');
   expect(raw).toContain('SameSite=Lax');
-  expect(raw).toContain('Path=/api');
+  expect(raw).toContain('Path=/;');
   expect(raw).not.toContain('Domain=');
   expect(raw).not.toContain('Secure');
   const token = cookieOf(response).slice(cookieName.length + 1);
@@ -577,9 +577,7 @@ test('auth logout revokes copied cookies across instances, preserves other login
     .set('Cookie', first)
     .expect(200);
   const response = await logout(first).expect(204);
-  expect(String(response.headers['set-cookie'])).toContain(
-    'Path=/api; Expires=Thu, 01 Jan 1970',
-  );
+  expect((response.headers['set-cookie'] as unknown as string[])[0]).toContain('Path=/; Expires=Thu, 01 Jan 1970');
   await request(app.getHttpServer())
     .get('/api/auth/me')
     .set('Cookie', first)

@@ -14,7 +14,7 @@ Follow the [root setup instructions](../../README.md#install-and-run) first.
 Then run this command from the repository root:
 
 ```powershell
-bun --env-file=.env run dev:api
+bun --env-file=.env run --filter api dev
 ```
 
 The API runs at `http://localhost:4000` by default. The web app sends its
@@ -33,15 +33,15 @@ All paths include the `/api` prefix.
 Shared HTTP setup applies `Cache-Control: no-store` to every API response,
 including parser, authentication, and routing errors.
 
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| GET | `/health` | Public | Returns `{ "ok": true }` |
-| POST | `/auth/login` | Public | Logs in and sets an HttpOnly cookie |
-| GET | `/auth/me` | Staff | Returns the current user |
-| POST | `/auth/logout` | Public | Revokes the current session and clears the cookie |
-| GET | `/orders` | Staff | Lists orders using cursor pagination |
-| POST | `/orders` | Staff | Creates an order |
-| DELETE | `/orders/:id` | Admin | Deletes an order |
+| Method | Path           | Auth   | Description                                       |
+| ------ | -------------- | ------ | ------------------------------------------------- |
+| GET    | `/health`      | Public | Returns `{ "ok": true }`                          |
+| POST   | `/auth/login`  | Public | Logs in and sets an HttpOnly cookie               |
+| GET    | `/auth/me`     | Staff  | Returns the current user                          |
+| POST   | `/auth/logout` | Public | Revokes the current session and clears the cookie |
+| GET    | `/orders`      | Staff  | Lists orders using cursor pagination              |
+| POST   | `/orders`      | Staff  | Creates an order                                  |
+| DELETE | `/orders/:id`  | Admin  | Deletes an order                                  |
 
 ### Login
 
@@ -60,8 +60,8 @@ send this cookie automatically on later requests.
 
 Seeded accounts:
 
-| Role | Email | Password |
-| --- | --- | --- |
+| Role  | Email               | Password        |
+| ----- | ------------------- | --------------- |
 | Admin | `admin@example.com` | `AdminDemo123!` |
 | Agent | `agent@example.com` | `AgentDemo123!` |
 
@@ -131,13 +131,13 @@ recreate a deleted order.
 
 - Login, logout, order creation, and deletion require an `Origin` matching `APP_ORIGIN`.
 - Authentication uses an HttpOnly, SameSite=Lax cookie.
-- Cookies use `Path=/api`.
+- Cookies use `Path=/` so Next.js can authenticate server-rendered pages.
 - Cookies are Secure in production and work over HTTP in development/test mode.
 - Tokens are not returned in JSON, URLs, or Authorization headers.
 - Login is limited to 5 attempts per minute per IP.
 - JSON request bodies are limited to 32 KB.
 - `AUTH_COOKIE` controls the cookie name.
-- `TOKEN_SECONDS` controls the session lifetime. The default is 900 seconds.
+- `TOKEN_SECONDS` is required and controls the session lifetime; the environment template uses 900 seconds.
 - Every protected request validates the database session and the user's current role.
 
 ## Checks
@@ -145,8 +145,6 @@ recreate a deleted order.
 Run from the repository root:
 
 ```powershell
-bun run test:api
-bun run test:idempotency
 bun run --filter api typecheck
 bun run --filter api lint
 ```
@@ -161,6 +159,5 @@ bun run db:test:migrate
 To demonstrate idempotent order creation:
 
 ```powershell
-bun run demo:idempotency
+bun run --filter api test:idempotency
 ```
-
